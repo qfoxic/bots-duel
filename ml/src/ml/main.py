@@ -24,17 +24,24 @@ async def websocket_endpoint(websocket: WebSocket, bot_id: str):
             data = await websocket.receive_text()
             message = json.loads(data)
 
-            message_type = message.get("type")
+            message_type = message["type"]
 
             if message_type == "JoinTournament":
                 # TODO. Error. Bot can join multiple tournaments. Please fix. It can join only one tournament at a time.
-                tournament = message.get("tournament")
+                tournament = message["tournament"]
                 await manager.join_tournament(tournament)
-                await manager.notify_tournament(tournament)
-                manager.debug_tournaments()
+                await manager.notify_tournament_non_participants(tournament)
             elif message_type == "CreateTournament":
-                await manager.create_tournament(message.get("tournament"))
-                manager.debug_tournaments()
+                await manager.create_tournament(message["tournament"])
+            elif message_type == "TournamentMoveDone":
+                await manager.tournament_move_done(message["tournament"], message["move"])
+            elif message_type == "TournamentFinished":
+                tournament = message["tournament"]
+                # TODO. Train is a blocking operation for some reason. Please fix it. Also, we need to think on making it by request.
+                await manager.tournament_finished(tournament, message["result"])
+                await manager.notify_tournament_non_participants(tournament)
+            elif message_type == "TournamentAskForCoord":
+                await manager.tournament_ask_for_coord(message["tournament"])
 
     except WebSocketDisconnect:
         await manager.disconnect_bot(bot_id)

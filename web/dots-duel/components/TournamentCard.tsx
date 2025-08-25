@@ -15,17 +15,14 @@ const statusColors = {
 } as const
 
 export const TournamentCard = ({ tournament, currentBot, onJoin }: TournamentCardProps) => {
-  const {participants, maxParticipants, status } = tournament
-  const canJoin = currentBot && status === 'upcoming' && participants.length < maxParticipants
+  const { status } = tournament
+  const canJoin = currentBot && status === 'upcoming'
 
   return (
     <div className="px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200">
       <div className="flex justify-between items-start">
         <div className="flex-1">
-          <div className="text-lg font-semibold text-gray-800">{tournament.id}</div>
-          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-            <span>{participants.length}/{maxParticipants} participants</span>
-          </div>
+          <div className="text-lg font-semibold text-gray-800">{tournament.owner.id}</div>
         </div>
         <div className="flex items-center gap-2">
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[status]}`}>

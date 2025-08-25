@@ -1,8 +1,9 @@
+export enum BotType {
+  AUTO = 'auto',
+  MANUAL = 'manual'
+}
+
 export interface Bot {
   id: string
-  type: 'auto' | 'manual'
-  wins: number
-  losses: number
-  rating: number
-  status: 'active' | 'inactive'
+  type: BotType
 }

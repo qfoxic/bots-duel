@@ -1,25 +1,26 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { Tournament } from '@/types/Tournament'
+import { Tournament, GRID_COLS, GRID_ROWS, TournamentStatus } from '@/types/Tournament'
+import { BotType } from '@/types/Bot'
 import { useBots } from '@/contexts/BotsContext'
 import { useTournaments } from '@/contexts/TournamentsContext'
 import { TournamentCard } from '@/components/TournamentCard'
 import { ConnectionStatus } from '@/components/ConnectionStatus'
 import { Section } from '@/components/Section'
-import { TournamentEvents, NotifyTournamentEvent, CreateTournamentEvent } from '@/types/Message'
 
 
 export default function Home() {
-  const { currentBot, connectionStatus, sendWebSocketMessage, onMessage, offMessage } = useBots()
-  const { tournaments, setTournaments, currentTournament, setCurrentTournament, setCurrentPlayer } = useTournaments()
+  const { currentBot, connectionStatus, setCurrentBot, sendWebSocketMessage, onMessage, saveBotToSession } = useBots();
+  const { tournaments, setTournaments, currentTournament, setCurrentTournament } = useTournaments();
   const router = useRouter()
 
   const handleJoinTournament = (tournament: Tournament) => {
-    if (!currentBot) return;
+    if (!currentBot)
+      return;
 
     setCurrentTournament(tournament);
-    setCurrentPlayer(tournament.bot);
+
     sendWebSocketMessage({
       type: 'JoinTournament',
       tournament: {
@@ -27,32 +28,40 @@ export default function Home() {
         bot: currentBot
       }
     });
-    router.push(`/match/${tournament.id}`);
+    router.push(`/match`);
   }
 
   const handleCreateTournament = () => {
-    if (!currentBot) return;
-    if (currentTournament) return;
+    if (!currentBot)
+      return;
 
     const tournamentData: Tournament = {
       id: Math.random().toString().substring(2, 10),
+      owner: currentBot, // Set the current bot as the owner
       bot: currentBot,
-      status: 'upcoming' as const,
+      status: TournamentStatus.UPCOMING,
       participants: [currentBot.id],
-      maxParticipants: 2
+      dims: [GRID_ROWS, GRID_COLS]
     }
 
     setCurrentTournament(tournamentData);
-    setCurrentPlayer(currentBot);
+
     sendWebSocketMessage({
       type: 'CreateTournament',
       tournament: tournamentData
     });
-    router.push(`/match/${tournamentData.id}`);
+    router.push(`/match`);
   }
 
+  const handleSetBotType = (bt: BotType) => {
+    if (!currentBot) return;
+    currentBot.type = bt;
+    saveBotToSession(currentBot);
+    setCurrentBot({ ...currentBot });
+  };
+
   useEffect(() => {
-    onMessage('NotifyTournament', ((message: NotifyTournamentEvent) => {
+    const notify = onMessage('NotifyTournament', (message) => {
       setTournaments(prev => {
         const existingIndex = prev.findIndex(t => t.id === message.tournament.id);
         if (existingIndex >= 0) {
@@ -63,19 +72,19 @@ export default function Home() {
           return [...prev, message.tournament];
         }
       });
-    }) as unknown as (m: TournamentEvents) => void);
+    });
 
-    onMessage('CreateTournament', ((message: CreateTournamentEvent) => {
+    const create = onMessage('CreateTournament', (message) => {
       setTournaments(prev => {
         return [...prev, message.tournament];
       });
-    }) as unknown as (m: TournamentEvents) => void);
+    });
 
     return () => {
-      offMessage('NotifyTournament')
-      offMessage('CreateTournament')
+      notify();
+      create();
     }
-  }, [onMessage, offMessage, setTournaments])
+  }, [onMessage, setTournaments])
 
 
   return (
@@ -84,47 +93,60 @@ export default function Home() {
         {/* Current Bot Header */}
         {currentBot && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xl">
-                {currentBot.id}
-              </div>
-              <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-800">{currentBot.id}</h2>
-                <div className="flex space-x-4 text-sm text-gray-600">
-                  <span>Type: {currentBot.type}</span>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-gray-800 truncate">{currentBot.id} <span><ConnectionStatus status={connectionStatus} /></span></h2>
+                <div className="mt-1 flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="inline-flex rounded-md border border-gray-300 bg-white">
+                      <button
+                        type="button"
+                        onClick={() => handleSetBotType(BotType.MANUAL)}
+                        className={`px-2.5 py-1 text-xs transition ${currentBot.type === BotType.MANUAL
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        manual bot
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetBotType(BotType.AUTO)}
+                        className={`px-2.5 py-1 text-xs transition border-l border-gray-300 ${currentBot.type === BotType.AUTO
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        auto bot
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-2">
-                  <ConnectionStatus status={connectionStatus} />
-                </div>
               </div>
-              {currentBot && (
-                <button
-                  onClick={handleCreateTournament}
-                  disabled={currentTournament !== null}
-                  className={`px-4 py-2 font-semibold rounded-lg transition-colors ${
-                    currentTournament === null
-                      ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-                      : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+
+              <button
+                onClick={handleCreateTournament}
+                disabled={!!currentTournament}
+                className={`px-4 py-2 font-semibold rounded-lg transition-colors ${!currentTournament
+                  ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+                  : 'bg-gray-400 text-gray-200 cursor-not-allowed'
                   }`}
-                >
-                  Create Tournament
-                </button>
-              )}
+              >
+                Create Tournament
+              </button>
             </div>
           </div>
         )}
 
         <Section title="Tournaments" color="bg-green-500">
-          {
-            tournaments.map((tournament: Tournament) => (
-              <TournamentCard
-                key={tournament.id}
-                tournament={tournament}
-                currentBot={currentBot}
-                onJoin={handleJoinTournament}
-              />
-            ))
-          }
+          {tournaments.map((tournament: Tournament) => (
+            <TournamentCard
+              key={tournament.id}
+              tournament={tournament}
+              currentBot={currentBot}
+              onJoin={handleJoinTournament}
+            />
+          ))}
         </Section>
       </div>
     </div>
