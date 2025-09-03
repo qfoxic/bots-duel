@@ -22,7 +22,7 @@ run:
 	@echo "🚀 Starting development server..."
 	@echo "📖 API documentation: http://localhost:8000/docs"
 	@echo "🛑 Press Ctrl+C to stop"
-	poetry run uvicorn src.ml.main:app --reload --host 0.0.0.0 --port 8000
+	poetry run python -m src.ml.supervisor
 
 # Run tests
 test:
@@ -44,3 +44,13 @@ clean:
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name "__pycache__" -delete
 	@echo "✅ Cleanup complete!"
+
+
+# Infra: Redis + RedisInsight
+infra:
+	@echo "🐳 Starting Redis infrastructure..."
+	docker compose -f docker-compose.yaml up -d
+
+infra-down:
+	@echo "🛑 Stopping Redis infrastructure..."
+	docker compose -f docker-compose.yaml down

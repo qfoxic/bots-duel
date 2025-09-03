@@ -1,5 +1,6 @@
 import os
 import sys
+import asyncio
 from collections import deque
 from dataclasses import dataclass, field
 from typing import List
@@ -314,7 +315,7 @@ class ResBlock(nn.Module):
 
 
 class AxialBlock(nn.Module):
-    def __init__(self, ch=64, heads=4, dropout=0.0):
+    def __init__(self, ch=64, heads=4, dropout=0.1):
         super().__init__()
         assert ch % heads == 0, "ch must be divisible by heads"
         self.ln   = nn.LayerNorm(ch)
@@ -422,6 +423,7 @@ class TrainableBot:
         self.opt = torch.optim.AdamW(self.model.parameters(), lr=1e-4, weight_decay=1e-4)
         self.board = Board(rows, cols, owner)
 
+    # TODO. Make this method async
     @torch.no_grad()
     def act(self, temperature: float = 0.6, greedy: bool = False):
         """
