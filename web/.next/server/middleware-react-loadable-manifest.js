@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST='{"app/match/page.tsx -> @/components/GameDashboard":{"id":6589,"files":["static/chunks/1329d575.186f7f7fc7db7372.js","static/chunks/716.b83ed28419b68f63.js","static/chunks/589.52da2cb26362d710.js"]}}';
