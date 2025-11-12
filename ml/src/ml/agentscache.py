@@ -5,7 +5,7 @@ from typing import Dict, List
 
 from .data_types import Tournament
 from .model import TrainableBot
-
+# TODO. remove this class
 
 class AgentsCache:
     def __init__(self, models_path: str) -> None:
@@ -17,9 +17,9 @@ class AgentsCache:
         return os.path.join(self._models_path, f"{bot_id}.pt")
 
     def add(self, bot_id: str, rows: int, cols: int) -> TrainableBot:
-        self._bots[bot_id] = TrainableBot(rows, cols, {"id": bot_id})
-        self._bots[bot_id].load(self.model_path(bot_id))
-        return self._bots[bot_id]
+        if bot_id not in self._bots:
+            self._bots[bot_id] = TrainableBot(rows, cols, {"id": bot_id})
+            self._bots[bot_id].load(self.model_path(bot_id))
 
     def move(self, bot_id: str, tournament: Tournament, move: List[int]) -> None:
         self._bots.get(bot_id).record_step(tournament, move)

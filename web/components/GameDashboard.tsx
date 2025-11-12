@@ -3,7 +3,7 @@ import { useBots } from '@/contexts/BotsContext'
 import { useTournaments } from '@/contexts/TournamentsContext'
 import { Bot, BotType } from '@/types/Bot'
 import { Coord } from '@/types/Coord'
-import { Result, TournamentAskForCoordEvent, TournamentMoveDoneEvent, Winner } from '@/types/Message'
+import { TournamentAskForCoordEvent, TournamentMoveDoneEvent, Winner } from '@/types/Message'
 import { GRID_COLS, GRID_ROWS, Tournament, TournamentStatus } from '@/types/Tournament'
 import Konva from 'konva'
 import { useRouter } from 'next/navigation'
@@ -49,6 +49,7 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
   const layerRef = useRef<Konva.Layer>(null);
   const [toast, setToast] = React.useState<{ title: string }>({ title: '' });
   const [finished, setFinished] = React.useState<boolean>(false);
+  const [botIsTraining, setBotIsTraining] = React.useState<boolean>(false);
   const finishedRef = React.useRef<boolean>(false);
   const capsRef = useRef<Caps>({ myCaptures: 0, oppCaptures: 0 });
   const oppRef = useRef<Bot | null>(
@@ -165,6 +166,7 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
       }
 
       if (currentBot.type === BotType.AUTO && currentBot.id !== tournament.bot.id) {
+        if (finishedRef.current) return;
         sendWebSocketMessage({
           type: 'TournamentAskForCoord',
           tournament: { ...message.tournament, bot: currentBot }
@@ -273,19 +275,27 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
                 </div>
                 <button
                   type="button"
+                  disabled={botIsTraining}
                   onClick={() => {
                     if (currentTournament) {
-                      setTournaments(prev =>
-                        prev.map(t => t.id === currentTournament.id ? { ...t, participants: [], status: TournamentStatus.COMPLETED } : t)
-                      );
+                      setBotIsTraining(true);
+                      sendWebSocketMessage({
+                        type: "TournamentTrainBot",
+                        tournament: { ...currentTournament, bot: currentBot },
+                      });
                     }
-                    setCurrentTournament(null);
-                    router.push('/');
                   }}
                   className="ml-1 inline-flex items-center rounded-md border border-white/10 bg-white/10 px-3 py-1.5 text-xs
-                     hover:bg-white/15"
+                            hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Train bot
+                  {botIsTraining ? (
+                    <>
+                      <span className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                      Training...
+                    </>
+                  ) : (
+                    "Train bot"
+                  )}
                 </button>
                 <button
                   type="button"

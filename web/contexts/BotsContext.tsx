@@ -41,7 +41,6 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   const reconnectAttempt = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageHandlers = useRef<Map<string, Set<MessageHandler>>>(new Map());
-  const messageBuffer = useRef<Map<string, TournamentEvents[]>>(new Map());
 
   const clearReconnectTimer = () => {
     if (reconnectTimer.current) {
@@ -50,27 +49,11 @@ export function BotsProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  function enqueueMessage(msg: TournamentEvents) {
-    const arr = messageBuffer.current.get(msg.type) ?? [];
-    arr.push(msg);
-    messageBuffer.current.set(msg.type, arr);
-    processQueue(msg.type);
-  };
-
-  function processQueue(messageType: EventType) {
-    const handlers = messageHandlers.current.get(messageType);
+  function processQueue(msg: TournamentEvents) {
+    const handlers = messageHandlers.current.get(msg.type);
     if (!handlers || handlers.size === 0) return;
-
-    const queue = messageBuffer.current.get(messageType);
-    if (!queue || queue.length === 0) return;
-
-    const toDeliver = queue.splice(0, queue.length);
-    messageBuffer.current.set(messageType, []);
-
-    for (const m of toDeliver) {
-      for (const h of handlers) {
-        try { h(m); } catch (e) { console.error(e); }
-      }
+    for (const h of handlers) {
+      try { h(msg); } catch (e) { console.error(e); }
     }
   };
 
@@ -105,8 +88,6 @@ export function BotsProvider({ children }: { children: ReactNode }) {
     }
     set.add(handler);
 
-    processQueue(messageType);
-
     return () => {
       const s = messageHandlers.current.get(messageType);
       if (!s) return;
@@ -133,7 +114,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
     socket.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as TournamentEvents;
-        enqueueMessage(message);
+        processQueue(message);
       } catch (e) {
         console.error('Error parsing WebSocket message:', e);
       }

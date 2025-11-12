@@ -54,9 +54,14 @@ export type TournamentAskForCoordEvent = {
   coord?: Coord
 };
 
+export type TournamentTrainBotEvent = {
+  type: 'TournamentTrainBot'
+  tournament: Tournament
+};
+
 export type TournamentEvents = (
   JoinTournamentEvent | CreateTournamentEvent | NotifyTournamentEvent |
-  TournamentMoveDoneEvent | TournamentFinishedEvent | TournamentAskForCoordEvent
+  TournamentMoveDoneEvent | TournamentFinishedEvent | TournamentAskForCoordEvent | TournamentTrainBotEvent
 );
 
 export type EventType = TournamentEvents['type'];

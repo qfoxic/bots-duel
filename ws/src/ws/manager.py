@@ -24,9 +24,20 @@ class RedisManager:
             del self._clients[bot_id]
 
     async def notify_bots(self, cond, msg):
+        """Notify all connected bots(web) that satisfy the condition."""
         for bot_id, ws in self._clients.items():
             if cond(bot_id):
-                await ws.send_text(json.dumps(msg))
+                await ws.send_text(msg)
+
+    async def notify_bot(self, bot_id: str, msg):
+        """Notify a specific bot(web) by id."""
+        if bot_id in self._clients:
+            ws = self._clients[bot_id]
+            await ws.send_text(msg)
+
+    async def notify_worker(self, bot_id: str, msg):
+        """Notify all worker (supervisor) in the tournament."""
+        await self.publish_to_worker(bot_id, msg)
 
     async def create_tournament(self, tournament: Tournament):
         tournament_id = tournament["id"]
@@ -38,7 +49,6 @@ class RedisManager:
         self._tournaments[tournament_id] = tournament
 
     async def join_tournament(self, tournament: Tournament):
-        print("Joining tournament:", tournament)
         participants = tournament["participants"]
         bot_id = tournament["bot"]["id"]
         tournament_id = tournament["id"]
@@ -51,6 +61,8 @@ class RedisManager:
             participants.append(bot_id)
             tournament["status"] = Status.ACTIVE
 
+        self._tournaments[tournament_id] = tournament
+
     async def start(self):
         self._redis = redis.from_url(self._dsn, encoding="utf-8", decode_responses=True)
 
@@ -60,13 +72,16 @@ class RedisManager:
         if self._redis:
             await self._redis.close()
 
-    async def publish_to_worker(self, tournament_id: str, payload: str):
-        await self._redis.publish(f"tournament:{tournament_id}:in", json.dumps(payload))
+    async def publish_to_worker(self, bot_id: str, payload: str):
+        await self._redis.lpush(f"tournament:{bot_id}:in", json.dumps(payload))
+        _, raw = await self._redis.brpop(f"tournament:{bot_id}:out")
+        return raw
 
-    async def subscribe_to_worker(self, tournament_id: str, async_callback):
-        pubsub = self._redis.pubsub(ignore_subscribe_messages=True)
-        print("Subscribing from tournament worker:", tournament_id)
-        await pubsub.subscribe(f"tournament:{tournament_id}:out")
+    async def subscribe_to_worker(self, bot_id: str, async_callback):
+        channel = f"tournament:{bot_id}:out"
+        pubsub = self._redis.pubsub(ignore_subscribe_messages=False)
+        print("Subscription done for tournament worker:", bot_id)
+        await pubsub.subscribe(channel)
 
         async def reader():
             try:
@@ -74,14 +89,18 @@ class RedisManager:
                     resp = json.loads(msg["data"])
                     await async_callback(resp)
             finally:
-                print("Unsubscribing from tournament worker:", tournament_id)
-                await pubsub.unsubscribe(f"tournament:{tournament_id}:out")
+                print("Unsubscribing from tournament worker:", bot_id)
+                await pubsub.unsubscribe(channel)
                 await pubsub.aclose()
 
         task = asyncio.create_task(reader())
         self._tasks.add(task)
         task.add_done_callback(lambda t: self._tasks.discard(t))
 
+    async def create_worker_channel(self, bot_id: str):
+        channel = "events"
+        await self._redis.lpush(channel, bot_id)
+        await self._redis.brpop(channel)
 
 # Global WebSocket manager instance
 manager = RedisManager(REDIS_URL)

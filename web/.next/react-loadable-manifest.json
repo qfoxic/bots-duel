@@ -1,10 +1,8 @@
 {
   "app/match/page.tsx -> @/components/GameDashboard": {
-    "id": 6589,
+    "id": "app/match/page.tsx -> @/components/GameDashboard",
     "files": [
-      "static/chunks/1329d575.186f7f7fc7db7372.js",
-      "static/chunks/716.b83ed28419b68f63.js",
-      "static/chunks/589.52da2cb26362d710.js"
+      "static/chunks/_app-pages-browser_components_GameDashboard_tsx.js"
     ]
   }
 }

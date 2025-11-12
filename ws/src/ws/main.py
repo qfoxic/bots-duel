@@ -27,36 +27,36 @@ async def ws_endpoint(ws: WebSocket, bot_id: str):
     await ws.accept()
     manager.add_client(bot_id, ws)
 
-    async def worker_callback(msg):
-        if msg["type"] == "TournamentAskForCoord":
-            await manager.notify_bots(lambda bot_id: bot_id == msg["tournament"]["bot"]["id"], msg)
-        if msg["type"] == "TournamentMoveDone":
-            await manager.notify_bots(lambda bot_id: bot_id == msg["bot"], {k: v for k, v in msg.items() if k != "bot"})
-
     try:
         while True:
             msg = json.loads(await ws.receive_text())
             msg_type = msg["type"]
-            if msg_type == "CreateTournament":
-                tournament = msg["tournament"]
-                await manager.publish_to_worker(tournament["id"], {})
-                await manager.subscribe_to_worker(tournament["id"], worker_callback)
-                await manager.create_tournament(tournament)
-                await manager.notify_bots(lambda bot_id, owner=tournament["owner"]: bot_id != owner["id"], msg)
-            elif msg_type == "JoinTournament":
-                tournament = msg["tournament"]
-                await manager.publish_to_worker(tournament["id"], msg)
-                await manager.join_tournament(tournament)
-                await manager.notify_bots(lambda bot_id, bot=tournament["bot"]: bot_id != bot["id"], msg)
-            elif msg_type == "TournamentAskForCoord":
-                await manager.publish_to_worker(tournament["id"], msg)
-            elif msg_type == "TournamentMoveDone":
-                await manager.publish_to_worker(tournament["id"], msg)
-            elif msg_type == "TournamentFinished":
-                await manager.publish_to_worker(tournament["id"], msg)
+            tournament = msg["tournament"]
+            current_bot_id = tournament["bot"]["id"]
+            match msg_type:
+                case "CreateTournament":
+                    await manager.create_tournament(tournament)
+                    await manager.notify_bots(lambda bot_id, owner=tournament["owner"]: bot_id != owner["id"], json.dumps(msg))
+                case "JoinTournament":
+                    await manager.create_worker_channel(current_bot_id)
+                    await manager.join_tournament(tournament)
+                    await manager.publish_to_worker(current_bot_id, msg)
+                    await manager.notify_bots(lambda bot_id, cid=current_bot_id: bot_id != cid, json.dumps(msg))
+                case "TournamentMoveDone":
+                    for pid in tournament["participants"]:
+                        reply = await manager.publish_to_worker(pid, msg)
+                        await manager.notify_bot(pid, reply)
+                case "TournamentAskForCoord":
+                    reply = await manager.publish_to_worker(current_bot_id, msg)
+                    await manager.notify_bot(current_bot_id, reply)
+                case "TournamentTrainBot":
+                    pass  # TODO. implement this
+                case "TournamentFinished":
+                    reply = await manager.publish_to_worker(current_bot_id, msg)
+                    await manager.notify_bot(current_bot_id, reply)
 
-    except WebSocketDisconnect:
-        print(f"WebSocket disconnected for bot {bot_id}")
+    except WebSocketDisconnect as e:
+        print(f"WebSocket disconnected for bot {bot_id}: {e}")
     finally:
         manager.remove_client(bot_id)
 

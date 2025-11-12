@@ -398,19 +398,15 @@ class PVNetSequential(nn.Module):
         B, H, W = pi.shape
         flat = pi.view(B, -1)
 
-        all_inf = torch.isinf(flat).all(-1, keepdim=True)
-        flat = torch.where(all_inf, torch.zeros_like(flat), flat)
-
-        if greedy or (temperature is not None and temperature <= 0):
+        if greedy:
             idx = flat.argmax(-1)
-            probs = F.softmax(flat, dim=-1)
         else:
-            probs = F.softmax(flat / max(temperature, 1e-6), dim=-1)
+            probs = F.softmax(flat / temperature, dim=-1)
             idx = torch.multinomial(probs, 1).squeeze(-1)
 
         y = idx // W
         x_ = idx %  W
-        return torch.stack([x_, y], -1), v.squeeze(-1), probs
+        return torch.stack([x_, y], -1)
 
 
 class TrainableBot:
@@ -423,7 +419,6 @@ class TrainableBot:
         self.opt = torch.optim.AdamW(self.model.parameters(), lr=1e-4, weight_decay=1e-4)
         self.board = Board(rows, cols, owner)
 
-    # TODO. Make this method async
     @torch.no_grad()
     def act(self, temperature: float = 0.6, greedy: bool = False):
         """
@@ -437,11 +432,9 @@ class TrainableBot:
         xb = x.unsqueeze(0)                    # [1,5,H,W]
         mb = legal.unsqueeze(0)                # [1,H,W] or [1,1,H,W]
 
-        coords, v, probs = self.model.act(xb, mb, temperature=temperature, greedy=greedy)
-        # coords: [B,2] = (x,y). We used B=1.
+        coords = self.model.act(xb, mb, temperature=temperature, greedy=greedy)
         x_, y = int(coords[0,0].item()), int(coords[0,1].item())
-
-        return (x_, y), float(v[0].item()), probs[0].cpu()
+        return x_, y
 
     def record_step(self, tournament: Tournament, move: List[int]) -> None:
         self.board.move(tournament, move)
