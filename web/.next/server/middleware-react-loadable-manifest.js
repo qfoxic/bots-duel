@@ -1,1 +1,0 @@
-self.__REACT_LOADABLE_MANIFEST="{\"app/match/page.tsx -> @/components/GameDashboard\":{\"id\":\"app/match/page.tsx -> @/components/GameDashboard\",\"files\":[\"static/chunks/_app-pages-browser_components_GameDashboard_tsx.js\"]}}"

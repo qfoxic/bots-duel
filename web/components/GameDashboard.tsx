@@ -179,15 +179,23 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
         move: [gx, gy]
       });
     });
+    const unTrain = onMessage('TournamentTrainBot', (message) => {
+      setTournaments(prev =>
+        prev.map(t => t.id === message.tournament.id ? { ...t, participants: [], status: TournamentStatus.COMPLETED } : t)
+      );
+      setBotIsTraining(false);
+      setCurrentTournament(null);
+      router.push('/');
+    });
     return () => {
       // TODO. Let's think on events like opponent left tournament etc.
-      // TODO!!!. Button train bot is there but doesn't send this event!!!
       // TODO. We need to fix the issue when opponent joins before owner, then all schema goes crazy
       unMove();
       unAsk();
       unJoin();
+      unTrain();
     }
-  }, [applyGrid, currentBot, onMessage, sendWebSocketMessage, setCurrentTournament]);
+  }, [applyGrid, currentBot, onMessage, sendWebSocketMessage, setCurrentTournament, router, setTournaments]);
 
   return (
     <div className="min-h-screen w-full bg-gray-950 text-gray-100">

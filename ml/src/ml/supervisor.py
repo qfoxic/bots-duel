@@ -77,11 +77,6 @@ async def tournament_worker_main(redis_url: str, bot_id: str, tournament_id: str
                     "resolution": bot.get_current_resolution(),
                 }))
             elif tournament_event["type"] == "TournamentTrainBot":
-                await r.lpush(output_channel, json.dumps({
-                    "type": "TournamentTrainBot",
-                    "tournament": tournament,
-                    "winner": tournament_event["winner"]
-                }))
                 if tournament_event["winner"] == "draw":
                     print(f"[worker {bot_id}:{tournament_id}] training bot {bot_id} with draw")
                     bot.train(Result.DRAW.value)
@@ -91,6 +86,11 @@ async def tournament_worker_main(redis_url: str, bot_id: str, tournament_id: str
                 elif tournament_event["winner"] == "opp":
                     print(f"[worker {bot_id}:{tournament_id}] training bot {bot_id} with loss")
                     bot.train(Result.LOSS.value)
+                await r.lpush(output_channel, json.dumps({
+                    "type": "TournamentTrainBot",
+                    "tournament": tournament,
+                    "winner": tournament_event["winner"]
+                }))
                 break
             elif tournament_event["type"] == "TournamentFinished":
                 await r.lpush(output_channel, json.dumps({
