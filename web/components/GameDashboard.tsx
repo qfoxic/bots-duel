@@ -51,7 +51,7 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
   const [finished, setFinished] = React.useState<boolean>(false);
   const [botIsTraining, setBotIsTraining] = React.useState<boolean>(false);
   const finishedRef = React.useRef<boolean>(false);
-  const capsRef = useRef<Caps>({ myCaptures: 0, oppCaptures: 0 });
+  const capsRef = useRef<Caps>({ myCaptures: 0, oppCaptures: 0});
   const oppRef = useRef<Bot | null>(
     initialTournament.owner.id === currentBot.id ? null : initialTournament.owner
   );
@@ -156,11 +156,6 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
         capsRef.current.oppCaptures = opp;
         if (winner) {
           showGameOverToast(winner);
-          sendWebSocketMessage({
-            type: 'TournamentFinished',
-            tournament: { ...tournament, bot: currentBot },
-            winner: winner === Winner.DRAW ? "" : winner === Winner.ME ? currentBot.id : oppRef.current!.id
-          });
           setFinished(true);
         }
       }
@@ -186,7 +181,7 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
     });
     return () => {
       // TODO. Let's think on events like opponent left tournament etc.
-      // TODO. Add button train bot on tournament end. please it next to back to tournaments button
+      // TODO!!!. Button train bot is there but doesn't send this event!!!
       // TODO. We need to fix the issue when opponent joins before owner, then all schema goes crazy
       unMove();
       unAsk();
@@ -278,10 +273,14 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
                   disabled={botIsTraining}
                   onClick={() => {
                     if (currentTournament) {
+                      const myCaps = capsRef.current.myCaptures;
+                      const oppCaps = capsRef.current.oppCaptures;
+
                       setBotIsTraining(true);
                       sendWebSocketMessage({
                         type: "TournamentTrainBot",
                         tournament: { ...currentTournament, bot: currentBot },
+                        winner: myCaps ==  oppCaps ? Winner.DRAW : (myCaps > oppCaps ? Winner.ME : Winner.OPP)
                       });
                     }
                   }}
@@ -304,6 +303,10 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
                       setTournaments(prev =>
                         prev.map(t => t.id === currentTournament.id ? { ...t, participants: [], status: TournamentStatus.COMPLETED } : t)
                       );
+                      sendWebSocketMessage({
+                        type: 'TournamentFinished',
+                        tournament: { ...currentTournament, bot: currentBot }
+                      });
                     }
                     setCurrentTournament(null);
                     router.push('/');

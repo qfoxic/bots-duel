@@ -72,35 +72,21 @@ class RedisManager:
         if self._redis:
             await self._redis.close()
 
-    async def publish_to_worker(self, bot_id: str, payload: str):
-        await self._redis.lpush(f"tournament:{bot_id}:in", json.dumps(payload))
-        _, raw = await self._redis.brpop(f"tournament:{bot_id}:out")
+    async def publish_to_worker(self, bot_id: str, tournament_id: str, payload: str):
+        print("\n\nPublishing to worker:", bot_id, tournament_id, payload)
+        await self._redis.lpush(f"tournament:{bot_id}:{tournament_id}:in", json.dumps(payload))
+        _, raw = await self._redis.blpop(f"tournament:{bot_id}:{tournament_id}:out")
+        print("Received from worker:", bot_id, raw, "\n\n")
         return raw
 
-    async def subscribe_to_worker(self, bot_id: str, async_callback):
-        channel = f"tournament:{bot_id}:out"
-        pubsub = self._redis.pubsub(ignore_subscribe_messages=False)
-        print("Subscription done for tournament worker:", bot_id)
-        await pubsub.subscribe(channel)
+    async def clear_worker_channels(self, bot_id: str, tournament_id: str):
+        await self._redis.delete(f"tournament:{bot_id}:{tournament_id}:in")
+        await self._redis.delete(f"tournament:{bot_id}:{tournament_id}:out")
 
-        async def reader():
-            try:
-                async for msg in pubsub.listen():
-                    resp = json.loads(msg["data"])
-                    await async_callback(resp)
-            finally:
-                print("Unsubscribing from tournament worker:", bot_id)
-                await pubsub.unsubscribe(channel)
-                await pubsub.aclose()
-
-        task = asyncio.create_task(reader())
-        self._tasks.add(task)
-        task.add_done_callback(lambda t: self._tasks.discard(t))
-
-    async def create_worker_channel(self, bot_id: str):
+    async def create_worker_channel(self, bot_id: str, tournament_id: str):
         channel = "events"
-        await self._redis.lpush(channel, bot_id)
-        await self._redis.brpop(channel)
+        await self._redis.lpush(channel, f"{bot_id}:{tournament_id}")
+        await self._redis.blpop(channel)
 
 # Global WebSocket manager instance
 manager = RedisManager(REDIS_URL)

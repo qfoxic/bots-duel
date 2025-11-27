@@ -1,2 +1,3 @@
-node_modules/
-web/.next/
+node_modules
+.next
+__pycache__

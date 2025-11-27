@@ -33,27 +33,30 @@ async def ws_endpoint(ws: WebSocket, bot_id: str):
             msg_type = msg["type"]
             tournament = msg["tournament"]
             current_bot_id = tournament["bot"]["id"]
+            tournament_id = tournament["id"]
             match msg_type:
                 case "CreateTournament":
                     await manager.create_tournament(tournament)
                     await manager.notify_bots(lambda bot_id, owner=tournament["owner"]: bot_id != owner["id"], json.dumps(msg))
                 case "JoinTournament":
-                    await manager.create_worker_channel(current_bot_id)
+                    await manager.create_worker_channel(current_bot_id, tournament_id)
                     await manager.join_tournament(tournament)
-                    await manager.publish_to_worker(current_bot_id, msg)
+                    await manager.publish_to_worker(current_bot_id, tournament_id, msg)
                     await manager.notify_bots(lambda bot_id, cid=current_bot_id: bot_id != cid, json.dumps(msg))
                 case "TournamentMoveDone":
                     for pid in tournament["participants"]:
-                        reply = await manager.publish_to_worker(pid, msg)
+                        reply = await manager.publish_to_worker(pid, tournament_id, msg)
                         await manager.notify_bot(pid, reply)
                 case "TournamentAskForCoord":
-                    reply = await manager.publish_to_worker(current_bot_id, msg)
+                    reply = await manager.publish_to_worker(current_bot_id, tournament_id, msg)
                     await manager.notify_bot(current_bot_id, reply)
                 case "TournamentTrainBot":
-                    pass  # TODO. implement this
-                case "TournamentFinished":
-                    reply = await manager.publish_to_worker(current_bot_id, msg)
+                    reply = await manager.publish_to_worker(current_bot_id, tournament_id, msg)
                     await manager.notify_bot(current_bot_id, reply)
+                case "TournamentFinished":
+                    reply = await manager.publish_to_worker(current_bot_id, tournament_id, msg)
+                    await manager.notify_bot(current_bot_id, reply)
+                    await manager.clear_worker_channels(current_bot_id, tournament_id)
 
     except WebSocketDisconnect as e:
         print(f"WebSocket disconnected for bot {bot_id}: {e}")

@@ -45,7 +45,6 @@ export type TournamentMoveDoneEvent = {
 export type TournamentFinishedEvent = {
   type: 'TournamentFinished'
   tournament: Tournament
-  winner: string
 };
 
 export type TournamentAskForCoordEvent = {
@@ -57,6 +56,7 @@ export type TournamentAskForCoordEvent = {
 export type TournamentTrainBotEvent = {
   type: 'TournamentTrainBot'
   tournament: Tournament
+  winner: Winner
 };
 
 export type TournamentEvents = (
