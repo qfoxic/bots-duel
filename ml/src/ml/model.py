@@ -392,20 +392,23 @@ class PVNetSequential(nn.Module):
         return logits.squeeze(1), value
 
     @torch.no_grad()
-    def act(self, x, legal_mask, temperature=1.0, greedy=False):
+    def act(self, x, legal_mask, temperature=1.0):
         pi, v = self.forward(x, legal_mask)   # [B,H,W], [B,1]
         B, H, W = pi.shape
         flat = pi.view(B, -1)
 
-        if greedy:
-            idx = flat.argmax(-1)
-        else:
-            probs = F.softmax(flat / temperature, dim=-1)
-            idx = torch.multinomial(probs, 1).squeeze(-1)
+        all_inf = torch.isinf(flat).all(dim=-1)  # [B]
+        coords = torch.full((B, 2), -1, device=pi.device, dtype=torch.long)
 
-        y = idx // W
-        x_ = idx %  W
-        return torch.stack([x_, y], -1)
+        ok = ~all_inf
+        if ok.any():
+            probs = F.softmax(flat[ok] / max(temperature, 1e-6), dim=-1)
+            idx_ok = torch.multinomial(probs, 1).squeeze(-1)  # [#ok]
+            y_ok = idx_ok // W
+            x_ok = idx_ok %  W
+            coords[ok] = torch.stack([x_ok, y_ok], dim=-1)
+
+        return coords
 
 
 class TrainableBot:
@@ -419,7 +422,7 @@ class TrainableBot:
         self.board = Board(rows, cols, owner)
 
     @torch.no_grad()
-    def act(self, temperature: float = 0.6, greedy: bool = False):
+    def act(self, temperature: float = 0.3):
         """
         Thin wrapper: pack tensors -> delegate to model.act
         Returns: ((x, y), value, probs_flat)
@@ -431,7 +434,7 @@ class TrainableBot:
         xb = x.unsqueeze(0)                    # [1,5,H,W]
         mb = legal.unsqueeze(0)                # [1,H,W] or [1,1,H,W]
 
-        coords = self.model.act(xb, mb, temperature=temperature, greedy=greedy)
+        coords = self.model.act(xb, mb, temperature=temperature)
         x_, y = int(coords[0,0].item()), int(coords[0,1].item())
         return x_, y
 

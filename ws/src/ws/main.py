@@ -35,6 +35,12 @@ async def ws_endpoint(ws: WebSocket, bot_id: str):
             current_bot_id = tournament["bot"]["id"]
             tournament_id = tournament["id"]
             match msg_type:
+                case "JoinSelfTournament":
+                    await manager.create_tournament(tournament)
+                    await manager.create_worker_channel(current_bot_id, tournament_id)
+                    await manager.join_tournament(tournament)
+                    reply = await manager.publish_to_worker(current_bot_id, tournament_id, msg)
+                    await manager.notify_bot(current_bot_id, reply)
                 case "CreateTournament":
                     await manager.create_tournament(tournament)
                     await manager.notify_bots(lambda bot_id, owner=tournament["owner"]: bot_id != owner["id"], json.dumps(msg))
@@ -47,6 +53,9 @@ async def ws_endpoint(ws: WebSocket, bot_id: str):
                     for pid in tournament["participants"]:
                         reply = await manager.publish_to_worker(pid, tournament_id, msg)
                         await manager.notify_bot(pid, reply)
+                case "TournamentSelfMoveDone":
+                    reply = await manager.publish_to_worker(current_bot_id, tournament_id, msg)
+                    await manager.notify_bot(current_bot_id, reply)
                 case "TournamentAskForCoord":
                     reply = await manager.publish_to_worker(current_bot_id, tournament_id, msg)
                     await manager.notify_bot(current_bot_id, reply)

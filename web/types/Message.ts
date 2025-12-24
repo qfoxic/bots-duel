@@ -59,9 +59,22 @@ export type TournamentTrainBotEvent = {
   winner: Winner
 };
 
+export type JoinSelfTournamentEvent = {
+  type: 'JoinSelfTournament'
+  tournament: Tournament
+};
+
+export type TournamentSelfMoveDoneEvent = {
+  type: 'TournamentSelfMoveDone'
+  tournament: Tournament
+  move: Coord
+  grid?: number[]
+  resolution?: GameResolution
+};
+
 export type TournamentEvents = (
   JoinTournamentEvent | CreateTournamentEvent | NotifyTournamentEvent |
-  TournamentMoveDoneEvent | TournamentFinishedEvent | TournamentAskForCoordEvent | TournamentTrainBotEvent
+  TournamentMoveDoneEvent | TournamentFinishedEvent | TournamentAskForCoordEvent | TournamentTrainBotEvent | JoinSelfTournamentEvent | TournamentSelfMoveDoneEvent
 );
 
 export type EventType = TournamentEvents['type'];

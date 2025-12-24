@@ -5,6 +5,7 @@ from typing import TypedDict, List, Literal
 class BotType(enum.StrEnum):
     AUTO = "auto"
     MANUAL = "manual"
+    SELF = "self"
 
 
 class Result(enum.IntEnum):

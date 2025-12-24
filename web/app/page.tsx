@@ -54,6 +54,32 @@ export default function Home() {
     });
   }
 
+  const handleSelfTournament = () => {
+    if (!currentBot)
+      return;
+    currentBot.type = BotType.SELF;
+    saveBotToSession(currentBot);
+    setCurrentBot({ ...currentBot });
+    const tournamentData: Tournament = {
+      id: Math.random().toString().substring(2, 10),
+      owner: {...currentBot},
+      bot: {...currentBot},
+      status: TournamentStatus.ACTIVE,
+      participants: [currentBot.id],
+      dims: [GRID_ROWS, GRID_COLS]
+    }
+    setCurrentTournament(tournamentData);
+    setTournaments(prev => {
+      return [...prev, tournamentData];
+    });
+    sendWebSocketMessage({
+      type: 'JoinSelfTournament',
+      tournament: tournamentData
+    });
+    setCurrentTournament(tournamentData);
+    router.push("/match");
+  }
+
   const handleSetBotType = (bt: BotType) => {
     if (!currentBot) return;
     currentBot.type = bt;
@@ -119,11 +145,25 @@ export default function Home() {
                       >
                         auto bot
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetBotType(BotType.SELF)}
+                        className={`px-2.5 py-1 text-xs transition border-l border-gray-300 ${currentBot.type === BotType.SELF
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        self bot
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
-
+              <button
+                onClick={handleSelfTournament}
+                className='px-4 py-2 font-semibold rounded-lg transition-colors bg-green-600 hover:bg-green-700 text-white cursor-pointer'>
+                Self Tournament
+              </button>
               <button
                 onClick={handleCreateTournament}
                 disabled={!!currentTournament}

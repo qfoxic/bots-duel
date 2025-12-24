@@ -1,6 +1,7 @@
 export enum BotType {
   AUTO = 'auto',
-  MANUAL = 'manual'
+  MANUAL = 'manual',
+  SELF = 'self'
 }
 
 export interface Bot {

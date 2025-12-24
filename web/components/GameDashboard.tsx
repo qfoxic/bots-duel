@@ -3,7 +3,7 @@ import { useBots } from '@/contexts/BotsContext'
 import { useTournaments } from '@/contexts/TournamentsContext'
 import { Bot, BotType } from '@/types/Bot'
 import { Coord } from '@/types/Coord'
-import { TournamentAskForCoordEvent, TournamentMoveDoneEvent, Winner } from '@/types/Message'
+import { TournamentAskForCoordEvent, TournamentMoveDoneEvent, TournamentSelfMoveDoneEvent, Winner } from '@/types/Message'
 import { GRID_COLS, GRID_ROWS, Tournament, TournamentStatus } from '@/types/Tournament'
 import Konva from 'konva'
 import { useRouter } from 'next/navigation'
@@ -84,7 +84,7 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
 
     const node = e.target;
     if (!node || node.getClassName() !== 'Rect') return;
-    if (currentTournament?.status !== 'active') return;
+    if (!(currentTournament?.status === TournamentStatus.ACTIVE)) return;
     if (!currentBot || !currentPlayer) return;
     if (currentPlayer.id !== currentBot.id) return;
     if (currentBot.type === BotType.AUTO) return;
@@ -98,7 +98,7 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
     layerRef.current?.batchDraw();
 
     sendWebSocketMessage({
-      type: 'TournamentMoveDone',
+      type: currentBot.type === BotType.SELF ? 'TournamentSelfMoveDone' : 'TournamentMoveDone',
       tournament: { ...currentTournament, bot: currentBot },
       move: [gx, gy],
     });
@@ -187,6 +187,29 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
       setCurrentTournament(null);
       router.push('/');
     });
+    const unSelfJoin = onMessage('JoinSelfTournament', (message) => {
+      if (finishedRef.current) return;
+      setCurrentTournament(message.tournament);
+      setCurrentOpponent(message.tournament.bot);
+    });
+    const unSelfMove = onMessage('TournamentSelfMoveDone', (message) => {
+      if (finishedRef.current) return;
+      const { tournament, grid, resolution, coord } = message as TournamentSelfMoveDoneEvent;
+
+      setCurrentTournament(tournament);
+      setCurrentPlayer(currentBot);
+      applyGrid(grid || []);
+
+      if (resolution) {
+        const { me, opp, winner } = resolution;
+        capsRef.current.myCaptures = me;
+        capsRef.current.oppCaptures = opp;
+        if (winner) {
+          showGameOverToast(winner);
+          setFinished(true);
+        }
+      }
+    });
     return () => {
       // TODO. Let's think on events like opponent left tournament etc.
       // TODO. We need to fix the issue when opponent joins before owner, then all schema goes crazy
@@ -194,6 +217,8 @@ export function GameDashboard({ initialTournament, currentBot }: GameDashboardPr
       unAsk();
       unJoin();
       unTrain();
+      unSelfJoin();
+      unSelfMove();
     }
   }, [applyGrid, currentBot, onMessage, sendWebSocketMessage, setCurrentTournament, router, setTournaments]);
 

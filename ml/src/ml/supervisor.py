@@ -10,6 +10,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 OK_REPLY = {"status": "ok"}
 BOTS_PATH = "./bots"
 
+
 async def shutdown(ps, r, *channels):
     await ps.unsubscribe(*channels)
     await ps.aclose()
@@ -31,7 +32,7 @@ async def tournament_worker_main(redis_url: str, bot_id: str, tournament_id: str
     import json
     import redis.asyncio as redis
     from .model import TrainableBot
-    from .data_types import Result
+    from .data_types import Result, BotType
 
     r = redis.from_url(redis_url, encoding="utf-8", decode_responses=True,
                        health_check_interval=30, socket_keepalive=True,
@@ -55,11 +56,19 @@ async def tournament_worker_main(redis_url: str, bot_id: str, tournament_id: str
                 print(f"[worker {bot_id}:{tournament_id}] bot {bot_id} created and model loaded.")
             if tournament_event["type"] == "JoinTournament":
                 print(f"[worker {bot_id}:{tournament_id}] event: Joined tournament {tournament_event}")
-                tournament = tournament_event["tournament"]
                 await r.lpush(output_channel, json.dumps(tournament_event))
+            elif tournament_event["type"] == "JoinSelfTournament":
+                print(f"[worker {bot_id}:{tournament_id}] event: Joined self tournament {tournament_event}")
+                tournament = tournament_event["tournament"]
+                tournament["bot"]["id"] = "test_bot"
+                tournament["bot"]["type"] = BotType.SELF
+                await r.lpush(output_channel, json.dumps({
+                    "type": "JoinSelfTournament",
+                    "tournament": tournament,
+                }))
             elif tournament_event["type"] == "TournamentAskForCoord":
                 tournament = tournament_event["tournament"]
-                x, y = bot.act(greedy=True)
+                x, y = bot.act()
                 await r.lpush(output_channel, json.dumps({
                     "type": "TournamentAskForCoord",
                     "tournament": tournament,
@@ -76,6 +85,26 @@ async def tournament_worker_main(redis_url: str, bot_id: str, tournament_id: str
                     "grid": bot.get_current_grid(),
                     "resolution": bot.get_current_resolution(),
                 }))
+            elif tournament_event["type"] == "TournamentSelfMoveDone":
+                print(f"[worker {bot_id}:{tournament_id}] event: Self move done {tournament_event}")
+                tournament = tournament_event["tournament"]
+                self_bot_tournament = {
+                    **tournament,
+                    "bot": {
+                        "id": "test_bot",
+                        "type": BotType.SELF
+                    }
+                }
+                bot.record_step(tournament, tournament_event["move"])
+                x, y = bot.act()
+                bot.record_step(self_bot_tournament, (x, y))
+                await r.lpush(output_channel, json.dumps({
+                    "type": "TournamentSelfMoveDone",
+                    "tournament": tournament,
+                    "move": tournament_event["move"],
+                    "grid": bot.get_current_grid(),
+                    "resolution": bot.get_current_resolution()
+                }))
             elif tournament_event["type"] == "TournamentTrainBot":
                 if tournament_event["winner"] == "draw":
                     print(f"[worker {bot_id}:{tournament_id}] training bot {bot_id} with draw")
@@ -86,6 +115,7 @@ async def tournament_worker_main(redis_url: str, bot_id: str, tournament_id: str
                 elif tournament_event["winner"] == "opp":
                     print(f"[worker {bot_id}:{tournament_id}] training bot {bot_id} with loss")
                     bot.train(Result.LOSS.value)
+                bot.save(os.path.join(BOTS_PATH, f"{bot_id}.pt"))
                 await r.lpush(output_channel, json.dumps({
                     "type": "TournamentTrainBot",
                     "tournament": tournament,
@@ -104,9 +134,6 @@ async def tournament_worker_main(redis_url: str, bot_id: str, tournament_id: str
         print(f"[worker {bot_id}:{tournament_id}] shutting down...")
         await r.aclose()
 
-# TODO. I think we need to create one process per bot. Because of TournamentFinished, which is sent from all bots simultaneously.
-#       So, one signal from one bot can terminate the worker, while other bots are still sending messages to it.
-#       But investigate how movements are synchronized between bots in a tournament first.
 # TODO. There is an issue with multiple bots joining different tournaments. For some reason, I saw tournaments getting mixed up.
 
 
