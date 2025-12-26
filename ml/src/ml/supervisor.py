@@ -96,7 +96,7 @@ async def tournament_worker_main(redis_url: str, bot_id: str, tournament_id: str
                     }
                 }
                 bot.record_step(tournament, tournament_event["move"])
-                x, y = bot.act()
+                x, y = bot.act(temperature=0.8)
                 bot.record_step(self_bot_tournament, (x, y))
                 await r.lpush(output_channel, json.dumps({
                     "type": "TournamentSelfMoveDone",

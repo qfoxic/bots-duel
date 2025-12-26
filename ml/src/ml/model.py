@@ -447,7 +447,7 @@ class TrainableBot:
     def get_current_resolution(self):
         return self.board.game_resolution()
 
-    def train(self, result: float, epochs: int = 1, batch_size: int = 64):
+    def train(self, result: float, epochs: int = 5, batch_size: int = 64):
         steps = self.board.states()
 
         pre      = steps[:-1]
